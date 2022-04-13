@@ -2,3 +2,7 @@ fastapi==0.75.1
 uvicorn==0.17.6
 SQLAlchemy==1.4.35
 alembic==1.7.7
+psycopg2-binary==2.9.3
+python-dotenv==0.20.0
+FastAPI-SQLAlchemy==0.2.1
+databases==0.5.5
