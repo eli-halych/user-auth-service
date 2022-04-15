@@ -33,18 +33,6 @@ TEST_EXPIRATION_DELTA = timedelta(days=1)
 TEST_JWT_HEADER = auth_handler.create_access_token(TEST_DATA_JWT, TEST_EXPIRATION_DELTA)
 TEST_TOKEN_NO_SUB = auth_handler.create_access_token(TEST_DATA_JWT_NO_SUB, TEST_EXPIRATION_DELTA)
 
-def test_invalid_token_type(client_fixture):
-    wrong_token_type = 'WrongType'
-
-    response = client_fixture.delete(
-        "/delete",
-        headers={
-            "Authorization": f"{wrong_token_type} {TEST_JWT_HEADER}"
-            })
-
-    assert response.status_code == 401
-    assert json.loads(response.content)['detail']  == 'Authorization failed.'
-
 def test_missing_sub_jwt(client_fixture):
 
     response = client_fixture.delete(

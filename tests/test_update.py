@@ -9,7 +9,6 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from auth import AuthHandler
-from models import User as ModelUser
 
 auth_handler = AuthHandler()
 
@@ -58,19 +57,6 @@ def test_auth_update_invalid_field(client_fixture, mock_user_obj_fixture):
 
     assert response.status_code == 422
     assert json.loads(response.content)['detail']  == 'Error while updating user\'s data.'
-
-def test_invalid_token_type(client_fixture):
-    token_type = 'WrongType'
-
-    response = client_fixture.put(
-        "/update",
-        json=TEST_DATA_JSON,
-        headers={
-            "Authorization": f"{token_type} {TEST_JWT_HEADER}"
-            })
-
-    assert response.status_code == 401
-    assert json.loads(response.content)['detail']  == 'Authorization failed.'
 
 def test_missing_sub_jwt(client_fixture):
 
