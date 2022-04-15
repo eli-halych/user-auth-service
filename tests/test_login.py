@@ -35,11 +35,15 @@ def test_login(client_fixture):
     assert data['token_type'] == 'Bearer'
 
 
-def test_login_invalid_credentials(client_fixture):
+def test_login_invalid_password(client_fixture):
     response = client_fixture.post("/login", json=TEST_INVALID_CREDENTIALS_JSON)
     assert response.status_code == 401
     assert json.loads(response.content)['detail']  == 'Username or/and password is invalid.'
 
+def test_login_invalid_username(client_fixture_none):
+    response = client_fixture_none.post("/login", json=TEST_INVALID_CREDENTIALS_JSON)
+    assert response.status_code == 403
+    assert json.loads(response.content)['detail']  == 'Access forbidden.'
 
 def test_auth_schema_validation(client_fixture):
     response = client_fixture.post("/login", json=TEST_INVALID_AUTH_SCHEMA_JSON)

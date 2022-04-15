@@ -2,11 +2,12 @@ import logging
 import crud
 
 import uvicorn
-from fastapi import FastAPI
-from fastapi import Depends, Security
+from fastapi import FastAPI, Response
+from fastapi import Depends
+from fastapi.responses import JSONResponse
 import os
 
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.security import HTTPBearer
 from dotenv import load_dotenv
 from schemas import UserAuthData as UserAuthSchema, UserCreateDB as UserCreateSchema
 
@@ -20,8 +21,13 @@ token_auth_scheme = HTTPBearer()
 
 app = FastAPI()
 
-# dependency
-def get_db():
+
+def get_db() -> SessionLocal:
+    """Database session generator.
+
+    Yields:
+        SessionLocal: database session.
+    """
     db = SessionLocal()
     try:
         yield db
@@ -30,29 +36,33 @@ def get_db():
 
 
 @app.post("/login")
-def login(auth_data: UserAuthSchema, db: Session = Depends(get_db)):
+def login(auth_data: UserAuthSchema, db: Session = Depends(get_db)) -> JSONResponse:
     logging.info("Requested /login with authentiation data.")
     return crud.login(db=db, auth_data=auth_data)
 
 
 @app.put("/update")
 def update(
-    data: dict, authorization: str = Depends(token_auth_scheme), db: Session = Depends(get_db)
-):
+    data: dict,
+    authorization: str = Depends(token_auth_scheme),
+    db: Session = Depends(get_db),
+) -> JSONResponse:
     logging.info("Requested /update with data of the fields to update.")
     token = authorization.credentials
     return crud.update_user(db=db, authorization=token, data=data)
 
 
 @app.delete("/delete")
-def delete(authorization: str = Depends(token_auth_scheme), db: Session = Depends(get_db)):
+def delete(
+    authorization: str = Depends(token_auth_scheme), db: Session = Depends(get_db)
+) -> JSONResponse:
     logging.info("Requested /delete with an Authorization token in header.")
     token = authorization.credentials
     return crud.remove_user(db=db, authorization=token)
 
 
 @app.post("/signup", status_code=201)
-def signup(user: UserCreateSchema, db: Session = Depends(get_db)):
+def signup(user: UserCreateSchema, db: Session = Depends(get_db)) -> JSONResponse:
     logging.info("Requested /signup with user data to create an account with.")
     return crud.create_user(db=db, user=user)
 
