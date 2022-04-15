@@ -6,3 +6,7 @@ psycopg2-binary==2.9.3
 python-dotenv==0.20.0
 FastAPI-SQLAlchemy==0.2.1
 databases==0.5.5
+py-bcrypt==0.4
+PyJWT==2.3.0
+pytest==7.1.1
+requests==2.27.1
