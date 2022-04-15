@@ -3,31 +3,24 @@ import crud
 
 import uvicorn
 from fastapi import FastAPI
-from fastapi import Depends, Header
+from fastapi import Depends, Security
 import os
-# from fastapi_sqlalchemy import DBSessionMiddleware
-from dotenv import load_dotenv
-from schemas import (
-    User as SchemaUser,
-    UserAuthData as UserAuthSchema,
-    UserCreateDB as UserCreateSchema)
 
-from datetime import timedelta
-from fastapi.responses import JSONResponse
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from dotenv import load_dotenv
+from schemas import UserAuthData as UserAuthSchema, UserCreateDB as UserCreateSchema
+
 from database import SessionLocal
 from sqlalchemy.orm import Session
-
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 load_dotenv(os.path.join(BASE_DIR, ".env"))
 
+token_auth_scheme = HTTPBearer()
+
 app = FastAPI()
 
-# app.add_middleware(DBSessionMiddleware, db_url=os.environ["DATABASE_URL"])
-
-# Dependency
+# dependency
 def get_db():
     db = SessionLocal()
     try:
@@ -35,21 +28,34 @@ def get_db():
     finally:
         db.close()
 
+
 @app.post("/login")
 def login(auth_data: UserAuthSchema, db: Session = Depends(get_db)):
+    logging.info("Requested /login with authentiation data.")
     return crud.login(db=db, auth_data=auth_data)
 
+
 @app.put("/update")
-def update(data: dict, Authorization: str = Header(None), db: Session = Depends(get_db)):
-    return crud.update_user(db=db, Authorization=Authorization, data=data)
+def update(
+    data: dict, authorization: str = Depends(token_auth_scheme), db: Session = Depends(get_db)
+):
+    logging.info("Requested /update with data of the fields to update.")
+    token = authorization.credentials
+    return crud.update_user(db=db, authorization=token, data=data)
+
 
 @app.delete("/delete")
-def delete(Authorization: str = Header(None), db: Session = Depends(get_db)):
-    return crud.remove_user(db=db, Authorization=Authorization)
+def delete(authorization: str = Depends(token_auth_scheme), db: Session = Depends(get_db)):
+    logging.info("Requested /delete with an Authorization token in header.")
+    token = authorization.credentials
+    return crud.remove_user(db=db, authorization=token)
+
 
 @app.post("/signup", status_code=201)
 def signup(user: UserCreateSchema, db: Session = Depends(get_db)):
+    logging.info("Requested /signup with user data to create an account with.")
     return crud.create_user(db=db, user=user)
+
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
