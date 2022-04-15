@@ -2,7 +2,10 @@ from fastapi import HTTPException
 import logging
 from sqlalchemy.orm import Session
 from models import User as ModelUser
-from schemas import UserAuthData as UserAuthSchema, UserCreateDB as UserCreateSchema
+from schemas.users import (
+    UserAuthData as UserAuthSchema,
+    UserCreateDB as UserCreateSchema,
+)
 from auth import AuthHandler
 from sqlalchemy.exc import IntegrityError
 from datetime import timedelta

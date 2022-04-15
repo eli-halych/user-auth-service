@@ -9,7 +9,14 @@ import os
 
 from fastapi.security import HTTPBearer
 from dotenv import load_dotenv
-from schemas import UserAuthData as UserAuthSchema, UserCreateDB as UserCreateSchema
+from schemas.users import (
+    UserAuthData as UserAuthSchema,
+    UserCreateDB as UserCreateSchema,
+)
+from schemas.responses import (
+    ResponseMessage as ResponseMessageSchema,
+    ResponseJWT as ResponseJWTSchema,
+)
 
 from database import SessionLocal
 from sqlalchemy.orm import Session
@@ -35,13 +42,13 @@ def get_db() -> SessionLocal:
         db.close()
 
 
-@app.post("/login")
+@app.post("/login", status_code=200, response_model=ResponseJWTSchema)
 def login(auth_data: UserAuthSchema, db: Session = Depends(get_db)) -> JSONResponse:
     logging.info("Requested /login with authentiation data.")
     return crud.login(db=db, auth_data=auth_data)
 
 
-@app.put("/update")
+@app.put("/update", status_code=200, response_model=ResponseMessageSchema)
 def update(
     data: dict,
     authorization: str = Depends(token_auth_scheme),
@@ -52,7 +59,7 @@ def update(
     return crud.update_user(db=db, authorization=token, data=data)
 
 
-@app.delete("/delete")
+@app.delete("/delete", status_code=200, response_model=ResponseMessageSchema)
 def delete(
     authorization: str = Depends(token_auth_scheme), db: Session = Depends(get_db)
 ) -> JSONResponse:
@@ -61,7 +68,7 @@ def delete(
     return crud.remove_user(db=db, authorization=token)
 
 
-@app.post("/signup", status_code=201)
+@app.post("/signup", status_code=201, response_model=ResponseMessageSchema)
 def signup(user: UserCreateSchema, db: Session = Depends(get_db)) -> JSONResponse:
     logging.info("Requested /signup with user data to create an account with.")
     return crud.create_user(db=db, user=user)
