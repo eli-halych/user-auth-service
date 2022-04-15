@@ -1,5 +1,5 @@
 from fastapi import HTTPException
-from sqlalchemy import select
+import logging
 from sqlalchemy.orm import Session
 from models import User as ModelUser
 from schemas import (
@@ -12,7 +12,10 @@ from datetime import timedelta
 auth_handler = AuthHandler()
 
 def create_user(db: Session, user: UserCreateSchema):
+    logging.info('Start creation.')
+
     hashed_password = auth_handler.get_hashed_password(user.password)
+    logging.info('Hashed password.')
     try:
         db_user = ModelUser(
             first_name=user.first_name,
@@ -22,82 +25,89 @@ def create_user(db: Session, user: UserCreateSchema):
         )
         db.add(db_user)
         db.commit()
+        logging.info('Created a entry in the database.')
     except IntegrityError as exc:
-        raise HTTPException(status_code=409, detail=str(exc))
+        code = 409
+        msg = str(exc)
+        logging.error('Operation was not successful.')
+        logging.debug(msg)
+        raise HTTPException(status_code=code, detail=msg)
 
     response = dict(msg=f"User {user.username} successfully created.")
 
     return response
 
-def remove_user(db: Session, Authorization: str):
+def remove_user(db: Session, authorization: str):
+    logging.info('Start removal.')
 
-    auth_header_split = Authorization.split(" ")
-
-    token_type = auth_header_split[0]
-    access_token = auth_header_split[1]
+    access_token = authorization
 
     payload = auth_handler.decode_access_token(access_token)
 
-    if token_type != 'Bearer':
-        raise HTTPException(status_code=401, detail='Authorization failed.')
-    elif 'sub' in payload:
-        user_id = payload['sub']
-    else:
-        raise HTTPException(
-            status_code=401,
-            detail=f'Authorization failed.')
+    user_id = get_user_id(payload)
 
     user = db.query(ModelUser).filter(ModelUser.id == user_id).first()
 
-    if not user:
-        raise HTTPException(
-            status_code=403,
-            detail=f'Access forbidden.')
-    else:
+    try:
+        user_exists(user)
+
         db.delete(user)
         db.commit()
+        logging.info('Removal successful')
+        logging.debug(f'User `{user.username}` deleted.')
+    except IntegrityError as exc:
+        code = 409
+        msg = str(exc)
+        logging.error('Operation was not successful.')
+        logging.debug(msg)
+        raise HTTPException(status_code=code, detail=msg)
 
     response = dict(msg=f'User {user.username} was successfully deleted.')
 
     return response
 
-def update_user(db: Session, Authorization: str, data: dict):
+def update_user(db: Session, authorization: str, data: dict):
+    logging.info('Start updating.')
 
-    auth_header_split = Authorization.split(" ")
+    access_token = authorization
 
-    token_type = auth_header_split[0]
-    access_token = auth_header_split[1]
+    logging.info('Extracted JWT token type and encoded data.')
 
     payload = auth_handler.decode_access_token(access_token)
 
-
-    if token_type != 'Bearer':
-        raise HTTPException(status_code=401, detail='Authorization failed.')
-    elif 'sub' in payload:
-        user_id = payload['sub']
-    else:
-        raise HTTPException(status_code=401, detail='Authorization failed.')
+    user_id = get_user_id(payload)
 
     user = db.query(ModelUser).filter(ModelUser.id == user_id).first()
 
-    if not user:
-        raise HTTPException(status_code=403, detail='Access forbidden.')
+    user_exists(user)
 
     for key, value in data.items():
         if hasattr(user, key):
             setattr(user, key, value)
         else:
-            raise HTTPException(
-                status_code=422,
-                detail=f'Error while updating user\'s data.')
+            code = 422
+            msg = "Error while updating user\'s data."
+            logging.error("An attribute name to be updated doesn\'t exist.")
+            logging.debug(f"`{key}` attribute doesn\'t exist in the database.")
+            raise HTTPException(status_code=code, detail=msg)
 
-    db.commit()
+    try:
+        db.commit()
+        logging.info("User updated.")
+    except IntegrityError as exc:
+        code = 409
+        msg = str(exc)
+        logging.error('Operation was not successful.')
+        logging.debug(msg)
+        raise HTTPException(status_code=code, detail=msg)
 
     response = dict(msg=f'User {user.username} was successfully updated.')
 
     return response
 
 def login(db: Session, auth_data: UserAuthSchema):
+    logging.info("Start logging in.")
+
     user = db.query(ModelUser).filter(ModelUser.username == auth_data.username).first()
 
     if not user:
@@ -106,15 +116,38 @@ def login(db: Session, auth_data: UserAuthSchema):
             detail='Username or/and password is invalid.')
 
     if not auth_handler.check_password(auth_data.password, user.password):
-        raise HTTPException(
-            status_code=401,
-            detail='Username or/and password is invalid.')
+        code = 401
+        msg = 'Username or/and password is invalid.'
+        logging.error(msg)
+        logging.debug("Password is invalid.")
+        raise HTTPException(status_code=code, detail=msg)
 
     payload = dict(sub=user.id, username=user.username)
 
     token = auth_handler.create_access_token(
         data=payload, expires_delta=timedelta(days=1))
 
+    logging.info("Logging successful.")
+
     response = dict(access_token=token, token_type='Bearer')
 
     return response
+
+def user_exists(user):
+    if not user:
+        code = 403
+        msg = 'Access forbidden.'
+        logging.error('Invalid Authorization token.')
+        raise HTTPException(status_code=code, detail=msg)
+
+
+def get_user_id(payload):
+    if 'sub' in payload:
+        user_id = payload['sub']
+    else:
+        code = 401
+        msg = 'Authorization failed.'
+        logging.error('JWT token has invalid payload.')
+        logging.debug('`sub` attribute is missing in JWT payload.')
+        raise HTTPException(status_code=code, detail=msg)
+    return user_id
