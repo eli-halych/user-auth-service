@@ -1,24 +1,13 @@
-from email import header
-from xml.dom import ValidationErr
 import pytest
-import copy
-from unittest.mock import MagicMock
-from fastapi.testclient import TestClient
-from fastapi import HTTPException
 import json
-import dotenv
-
-
+from datetime import timedelta
 
 import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from main import app, get_db
 from auth import AuthHandler
-from models import User as ModelUser
-# from auth import load_dotenv
-# load_dotenv = dotenv.load_dotenv('.env_test')
+
 
 auth_handler = AuthHandler()
 
@@ -36,42 +25,29 @@ TEST_INVALID_DATA_JSON = {
     "wrong_field": "test_value"
 }
 
-TEST_JWT_HEADER = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOjEsInVzZXJuYW1lIjoidGVzdF91c2VybmFtZSIsImV4cCI6MTY1MDExMjU2Mn0.KsEMSh974zYzeHVB0EBzByelPTmid0mFQkTMWSV_w7s"
-TEST_TOKEN_NO_SUB = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VybmFtZSI6InRlc3RfdXNlcm5hbWUiLCJleHAiOjE2NTAxMTIzNjl9.h91T4OqjMsrEZRgH3cyZacgF3lYjmzIcSTsqoeUOCFo"
+TEST_DATA_JWT = dict(sub=1, username='test_username')
+TEST_DATA_JWT_NO_SUB = dict(username='test_username')
 
-MOCK_USER_OBJ = MagicMock(
-    id=1,
-    username=TEST_CREDENTIALS_JSON['username'],
-    password=auth_handler.get_hashed_password(TEST_CREDENTIALS_JSON['password'])
-    )
+TEST_EXPIRATION_DELTA = timedelta(days=1)
 
-def override_get_db():
-    try:
-        db = MagicMock()
-        db.query.return_value.filter.return_value.first.return_value = MOCK_USER_OBJ
-        yield db
-    finally:
-        db.close()
+TEST_JWT_HEADER = auth_handler.create_access_token(TEST_DATA_JWT, TEST_EXPIRATION_DELTA)
+TEST_TOKEN_NO_SUB = auth_handler.create_access_token(TEST_DATA_JWT_NO_SUB, TEST_EXPIRATION_DELTA)
 
-app.dependency_overrides[get_db] = override_get_db
+def test_invalid_token_type(client_fixture):
+    wrong_token_type = 'WrongType'
 
-CLIENT = TestClient(app)
-
-def test_invalid_token_type():
-    token_type = 'WrongType'
-
-    response = CLIENT.delete(
+    response = client_fixture.delete(
         "/delete",
         headers={
-            "Authorization": f"{token_type} {TEST_JWT_HEADER}"
+            "Authorization": f"{wrong_token_type} {TEST_JWT_HEADER}"
             })
 
     assert response.status_code == 401
     assert json.loads(response.content)['detail']  == 'Authorization failed.'
 
-def test_missing_sub_jwt():
+def test_missing_sub_jwt(client_fixture):
 
-    response = CLIENT.delete(
+    response = client_fixture.delete(
         "/delete",
         headers={
             "Authorization": f"Bearer {TEST_TOKEN_NO_SUB}"
@@ -80,21 +56,9 @@ def test_missing_sub_jwt():
     assert response.status_code == 401
     assert json.loads(response.content)['detail']  == 'Authorization failed.'
 
-def test_missing_user():
+def test_missing_user(client_fixture_none):
 
-    def override_get_db():
-        try:
-            db = MagicMock()
-            db.query.return_value.filter.return_value.first.return_value = None
-            yield db
-        finally:
-            db.close()
-
-    app.dependency_overrides[get_db] = override_get_db
-
-    client = TestClient(app)
-
-    response = client.delete(
+    response = client_fixture_none.delete(
         "/delete",
         json=TEST_DATA_JSON,
         headers={

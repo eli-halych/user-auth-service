@@ -1,16 +1,13 @@
 from time import sleep
 import pytest
-from unittest import mock
 import fastapi
 
-from datetime import datetime
 from datetime import timedelta
 
 import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-# from main import app, get_db
 import auth
 auth.SECRET_KEY = 'test_secret_key'
 
